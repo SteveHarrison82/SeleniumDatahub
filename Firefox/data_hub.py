@@ -5,10 +5,12 @@ from bs4 import BeautifulSoup
 from robot.utils import asserts
 from robot.api import logger
 import time
+import pdb;
+#pdb.set_trace()
 
 # pybot -L DEBUG -vbrowser:Ie -vbaseurl:http://localhost:9996 datahub_testsuite_test.robot
 # pybot -L DEBUG -vbrowser:Firefox -vbaseurl:http://hulk:9960 datahub_testsuite_test.robot
-
+# https://e2open.my.salesforce.com/5006000000p9x1w
 
 class ExtJSHelper(Page):
 
@@ -16,13 +18,22 @@ class ExtJSHelper(Page):
         "go to testapplication": "/e2dh",
         "ActiveTab": "centertabpanel tabbar tab[active=\'true\']"
     }
+    
+    def _append_closeEl(self, id):
+        """ Appends string '-closeEl' to the id
+        Args:
+            id of html e.g 'ext-123'
+        Returns:
+            string '-triggerEl' appended 'ext-123-closeEl'
+        """
+        return id+'-closeEl'
 
     def _append_headerEl(self, id):
         """ Appends string '-headerEl' to the id
         Args:
             id of html e.g 'ext-123'
         Returns:
-            string '-triggerEl' appended 'ext-123-headerEl'
+            string '_header' appended 'ext-123_header'
         """
         return id+'_header'
 
@@ -63,10 +74,10 @@ class ExtJSHelper(Page):
         Returns:
             view property of the interested component
         """
-
-        my_query = """
-                return Ext.ComponentQuery.query(\"{0}\").getEl().dom.querySelector('input').id;
+        time.sleep(3)
+        my_query = """ return Ext.ComponentQuery.query(\"{0}\")[0].getEl().dom.querySelector('input').id;
              """.format(selector_section)
+        logger.debug("input filed id is queried by {0}".format(my_query))
         inputfield_id = self.execute_javascript(my_query)
         return self._append_id(inputfield_id)
 
@@ -79,7 +90,7 @@ class ExtJSHelper(Page):
         """
 
         my_query = """
-                return Ext.ComponentQuery.query(\"{0}\").getEl().dom.querySelectorAll('input');
+                return Ext.ComponentQuery.query(\"{0}\")[0].getEl().dom.querySelectorAll('input');
              """.format(selector_section)
         inputfields_dom = self.execute_javascript(my_query)
         return inputfields_dom
@@ -106,10 +117,10 @@ class ExtJSHelper(Page):
         """
 
         my_query = """
-                return Ext.ComponentQuery.query(\"{0}\").reduce(function(prev,component){var element =  component.getActionEl() ||  component.getEl(); if(element && element.dom){return prev.concat(element.id);}},[]);
-            """.format(selector_section)
+   return Ext.ComponentQuery.query('%s').reduce(function(prev,component){var element =  component.getActionEl() ||  component.getEl(); if(element && element.dom){return prev.concat(element.id);}},[]);
+   """ % selector_section.replace("'", "\\'")
         element_id = self.execute_javascript(my_query)
-        return element_id[0]
+        return self._append_id(element_id[0])
 
     def _get_component_all_nodes(self, selector_section):
         """ Fetches all nodes of the component
@@ -213,7 +224,7 @@ class ExtJSHelper(Page):
     def _construct_query(self, xtype, filter_value, filter_type='text'):
         """ Constructs a string to be used for quering using Ext.ComponentQuery.query API.
         This method is needed esp. when query parameter needs a filter.
-        E.g Consider query "processPanel headercontainer [text=Process Name]".
+        E.g Consider query "processPanel headercontainer[text=Process Name]".
         The filter in this case is '[text=Process Name]'
 
         Args:
@@ -367,27 +378,33 @@ class ExtJSHelper(Page):
         id = self.execute_javascript(my_query)
         return self._append_id(id)
 
-    def _get_active_tab(self, active_tab_xtype = None):
+    def _get_active_tab(self):
         """ Returns id of tab thats currently active(open)
         Returns:
             active_tab_id: Returns the id of the active tab in the format 'id=<active_tab_id>'
         """
-        if active_tab_xtype == None:
-            active_tab_xtype = self.custom_selectors['ActiveTab']
+
+        active_tab_xtype = self.custom_selectors['ActiveTab']
         active_tab_id = self._get_gridid(active_tab_xtype)
         # centertabpanel tabbar tab[active="true"]
         logger.debug("active tab id is {0}".format(active_tab_id))
-        return self._append_id(active_tab_id)
+        return active_tab_id
 
-    def close_tab(self, active_tab_id):
+    def _close_tab(self, id_active_tab):
         """ Closes the active tab.
         Args:
            active_tab_xtype: xtype of (active tab in centertabpanel)
         """
 
-        self.click_element(active_tab_id)
+        self.click_element(id_active_tab)
         return self
 
+    def close_active_tab(self):
+        #pdb.set_trace()
+        id_active_tab = self._get_active_tab()
+        id_active_tab_closeEl = self._append_closeEl(id_active_tab)
+        self.click_element(id_active_tab_closeEl)
+        return self
 
 class LoginPage(ExtJSHelper):
     name = "DatahubApp"
@@ -712,7 +729,7 @@ class DatahubMenu(ExtJSHelper):
         "id_proc_dependencies": "",
     }
 
-    def click_link_in_datahub_menu(self, menu_name='Process'):
+    def click_link_in_standard_report(self, menu_name='Process'):
         if menu_name == 'Process Run':
             self.click_process_run()
         elif menu_name == 'Process Dependenices':
@@ -727,6 +744,7 @@ class DatahubMenu(ExtJSHelper):
             self.click_process_not_processed()
         else:
             self.click_process()
+        return self    
 
     def click_process(self):
         time.sleep(5)
@@ -785,7 +803,15 @@ class DatahubMenu(ExtJSHelper):
         return Datahub()
 
 
-class DatahubMenuCommonActions():
+class StandardReportCommonActions():
+
+    selectors = {
+        "ClickOK": "xpath=//span[contains(text(),\"OK\")]",
+        "FromDate": "name=from",
+        "ToDate": "name=to",
+        "ClickClear": "xpath=//span[contains(text(),\"Clear\")]",
+        "ClickCancel": "xpath=//span[contains(text(),\"Cancel\")]",
+    }    
 
     custom_selectors = {
         "Text Body": "/html/body/div[3]/div[2]",
@@ -793,19 +819,16 @@ class DatahubMenuCommonActions():
         "MenuItem": 'menu menuitem',
     }
 
-    def _toggle_column(self, column_name):
+    def _toggle_column(self, column_name, menu_item):
         my_query = self._construct_query(self.custom_selectors["GridColumn"], column_name, 'text')
-        id = self._get_gridid(my_query, for_js=True, position=1)
+        id = self._get_gridid(my_query, for_js=True, position=0)
         id_triggerEl = self._append_triggerEl(id)
-        logger.debug('trigger element id is {0}'.format(id_triggerEl))
+        logger.debug('trigger element id is {0}'.format(id_triggerEl))        # looks as document.getEl..ID("gridcolumn..gerEl").click()'
         self._click_element_js(id_triggerEl)
-        # looks as execute_javascript('return document.getElementById("gridcolumn-
-        # 1200-triggerEl").click()')
         self.mouse_over("Menu items")
-        my_query = self._construct_query(self.custom_selectors["MenuItem"], column_name, 'text')
+        my_query = self._construct_query(self.custom_selectors["MenuItem"], menu_item, 'text')
         id_of_menucheckitem = self._get_gridid_2(my_query, for_js=False)
-        logger.debug('menucheck item id is  {0}'.format(id_of_menucheckitem))
-        # looks as Ext.ComponentQuery.query("menu menuitem [text = Process Name]")[0].id
+        logger.debug('menucheck item id is  {0}'.format(id_of_menucheckitem))    # looks as Ext.Com...query("menu .. [text = ..]")
         self.click_element(id_of_menucheckitem)
         return self
 
@@ -813,9 +836,15 @@ class DatahubMenuCommonActions():
         self.input_text(id, write_input_text)
         return self
 
-    def _input_date_into_filter(self, from_date, to_date):
-        pass
-
+    def _input_date_into_filter(self, id, from_date, to_date, clear=False):
+        self.click_element(id)
+        self.input_text("FromDate", from_date)
+        self.input_text("ToDate", to_date)
+        if clear:
+            self.click_element("ClickClear")
+        self.click_element("ClickOK")
+        return self
+        
     def _verify_filter(self, column_name, text_input):
         web_elements = self._get_elements_js(column_name)
         element_len = self._get_len_of_elements(web_elements)
@@ -824,9 +853,8 @@ class DatahubMenuCommonActions():
             assert text_input in verify_text
         return self
 
-
     def _click_button(self, Button):
-        #xtype_for_button = "processPanel reportTopBar button"
+        # xtype_for_button = "processPanel reportTopBar button"
         logger.debug(Button)
         id_element = self._get_gridid(Button)
         logger.debug("+id webelement *Retreive button* ={0} ".format(id_element))
@@ -834,7 +862,7 @@ class DatahubMenuCommonActions():
         return self
 
 
-class ProcessTab(ExtJSHelper, DatahubMenuCommonActions):
+class ProcessTab(ExtJSHelper, StandardReportCommonActions):
     uri = "/e2dh"
 
     selectors = {
@@ -852,21 +880,25 @@ class ProcessTab(ExtJSHelper, DatahubMenuCommonActions):
 
     custom_selectors = {
         "ProcessPanel": "processPanel",
+        "ProcessPanel gridcolumn":"processPanel gridcolumn",
         "ProcessPanel header":"processPanel header",
-        "Text Body": "/html/body/div[3]/div[2]",
-        "GridColumn": 'gridcolumn',
-        "MenuItem": 'menu menuitem',
         "Button": "processPanel reportTopBar button",
+        "Text Body": "/html/body/div[3]/div[2]",
+        "GridColumn": 'processPanel gridcolumn',
+        "MenuItem": 'menu menuitem',
         "Process Name": "x-grid-cell-processName",
         "Process Desc": "x-grid-cell-processDescription",
-        "Process Properties Window": "ProcessPropertiesWindow",
+        "Process Properties Window": "processPropertiesWindow",
+        "ActiveTab": "centertabpanel tabbar tab[active=\'true\']",
         "Tab": "centertabpanel tabbar tab"
     }
 
-    def toggle_table_column(self, column_name='Process Name'):
-        ''' Trigger the dropdown, move the mouse over, toggle the column name
-        '''
-        self._toggle_column(column_name)
+    @robot_alias("toggle_column_in__name__")
+    def toggle_table_column(self, column_name, menu_item):
+        # Trigger the dropdown, move the mouse over, toggle the column name
+
+        self._toggle_column(column_name, menu_item)
+        return self
 
     def type_input_process_name(self, text_input = "CLEAN%"):
         self.input_text("Process Name", text_input)
@@ -900,123 +932,479 @@ class ProcessTab(ExtJSHelper, DatahubMenuCommonActions):
         self.click_element(id_element)
         return self
 
+    @robot_alias("click_button_in__name__")
     def click_button(self, Button = "Retreive"):
         if Button == "Retrieve":
             self._click_button(self.custom_selectors["Button"])
         elif Button == "Add":
             pass
-
-    def verify_text_in_process_tab(self, search_text='Process Name'):
-        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
-        asserts.assert_true(search_text in text_body, "processTab doesnot contain {0}".format(search_text))
         return self
 
-    def input_text_into_filter(self, column_name, text_input):
-        xtype_input = self._construct_query(self.custom_selectors["ProcessPanel header"], column_name)
+    @robot_alias("verify_filter_in__name__")
+    def verify_text(self, search_text='Process Name', exist='True'):
+        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
+        logger.debug("value of exist is {0}".format(exist))
+        if exist == 'True':
+            asserts.assert_true(search_text in text_body, "processtab doesnot contain {0}".format(search_text))
+        elif exist == 'False':
+            asserts.assert_false(search_text in text_body, "processtab does contain {0}".format(search_text))
+        return self
+
+    @robot_alias("input_text_into__name__filter")
+    def input_text_into_filter(self, column_name, text_input, clear=False):
+        xtype_input = self._construct_query(self.custom_selectors["ProcessPanel gridcolumn"], column_name)
         id = self._get_inputfield_id(xtype_input)
+        if text_input == ' ' or clear:
+            self.clear_element_text(id)
+            return self
         self._input_text_into_filter(id, text_input)
+        return self
+
+    @robot_alias("input_date_into__name__filter")
+    def input_date_into_filter(self, column_name, start_date=None, end_date=None, clear=False):
+        xtype_input = self._construct_query(self.custom_selectors["ProcessPanel gridcolumn"], column_name)
+        id = self._get_inputfield_id(xtype_input)
+        self._input_date_into_filter(id, start_date, end_date, clear)
+        return self     
 
     def close_process_property(self):
         self.click_element("CloseProcessProperty")
         return self
 
-    def verify_filter(self, column_name, text_input):
-        #column_name = column_name + ' Column'
-        if not self.custom_selectors[column_name]:
-            # get the gridcolumn id e.g gridcolumn-123 from extjs api
-            # 'x-grid-cell-' append to the id e.g  x-grid-cell-gridcolumn-123
-            # self.custom_selectors[column_name] = 'x-grid-cell-gridcolumn-123'
-            pass
-        self._verify_filter(self.custom_selectors[column_name], text_input)
+    # def verify_filter(self, column_name, text_input):
+    #     #column_name = column_name + ' Column'
+    #     if not self.custom_selectors[column_name]:
+    #         # get the gridcolumn id e.g gridcolumn-123 from extjs api
+    #         # 'x-grid-cell-' append to the id e.g  x-grid-cell-gridcolumn-123
+    #         # self.custom_selectors[column_name] = 'x-grid-cell-gridcolumn-123'
+    #         pass
+    #     self._verify_filter(self.custom_selectors[column_name], text_input)
 
-    def click_all_process_and_close(self, close=True):
+    def click_all_process_and_close(self, close=True, apply_filter = False):
         web_elements = self._get_elements_js(self.custom_selectors["Process Name"])
         element_len = self._get_len_of_elements(web_elements)
         for each_element in range(element_len):
+            print element_len
+            time.sleep(4)
             get_text = self._get_textcontent_js(self.custom_selectors["Process Name"], each_element)
-            self.selectors["Click Process Name"].format(get_text)
-            self.click_element("Click Process Name")
+            # resolve_xpath = self.selectors["Click Process Name"]
+            # self.click_element(resolve_xpath.format(get_text))
+            if apply_filter:
+                self.input_text_into_filter("Process Name", get_text)
+                self.click_retreive_data()
+            resolve_xpath = self.selectors["Click Process Name"]
+            if len(self.find_elements(resolve_xpath.format(get_text)))>1:
+                self.find_elements(resolve_xpath.format(get_text))[-1].click()
+            else:
+                self.click_element(resolve_xpath.format(get_text))
+            time.sleep(4)
             inputfields_dom = self._get_all_inputfields(self.custom_selectors["Process Properties Window"])
             assert len(inputfields_dom) > 0
-            if close == True :
-            #if one process on filtering and dont want to close, then give close=False
+            if close:
+                # if one process on filtering and dont want to close, then give close=False
                 self.close_process_property()
+            if apply_filter:    
+                self.input_text_into_filter("Process Name", ' ')
+                self.click_retreive_data()
+        return self    
 
     def close_process_tab(self):
         selector_section = self._construct_query(self.custom_selectors["Tab"], "Process", "text")
         id_tab = self._get_component_id(selector_section)
-        id_tab_triggerEl = self._append_triggerEl(id_tab)
-        self.close_tab(id_tab_triggerEl)
-
-class ProcessRun(ExtJSHelper):
-
-    custom_selectors = {
-        "Text Body": "/html/body/div[3]/div[2]",
-    }
-
-    def verify_text_in_processrun(self, search_text='Process Run Ref'):
-        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
-        asserts.assert_true(search_text in text_body, "processrun doesnot contain {0}".format(search_text))
+        id_tab_closeEl = self._append_closeEl(id_tab)
+        self._close_tab(id_tab_closeEl)
         return self
 
-
-class ProcessLastRun(ExtJSHelper):
-
-    custom_selectors = {
-        "Text Body": "/html/body/div[3]/div[2]",
-    }
-
-    def verify_text_in_processlastrun(self, search_text='Process Run Ref'):
-        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
-        asserts.assert_true(search_text in text_body, "processrun doesnot contain {0}".format(search_text))
-        return self
-
-
-class ProcessLog(ExtJSHelper):
-
-    custom_selectors = {
-        "Text Body": "/html/body/div[3]/div[2]",
-    }
-
-    def verify_text_in_processlog(self, search_text='Process Run Ref'):
-        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
-        asserts.assert_true(search_text in text_body, "processrun doesnot contain {0}".format(search_text))
-        return self
-
-
-class ProcessNotProcessed(ExtJSHelper):
-
-    custom_selectors = {
-        "Text Body": "/html/body/div[3]/div[2]",
-    }
-
-    def verify_text_in_process_not_processed(self, search_text='Proc Run Reference'):
-        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
-        asserts.assert_true(search_text in text_body, "processnotprocessed doesnot contain {0}".format(search_text))
-        return self
-
-
-class ProcessRunDependency(ExtJSHelper):
-
-    custom_selectors = {
-        "Text Body": "/html/body/div[3]/div[2]",
-    }
-
-    def verify_text_in_process_run_dependency(self, search_text='Pre-Process Run Ref'):
-        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
-        asserts.assert_true(search_text in text_body, "processnotprocessed doesnot contain {0}".format(search_text))
-        return self
-
-
-class ProcessDependencies(ExtJSHelper):
-
-    custom_selectors = {
-        "Text Body": "/html/body/div[3]/div[2]",
-    }
-
-    def verify_text_in_process_run_dependencies(self, search_text='PK Load Table Name'):
-        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
-        asserts.assert_true(search_text in text_body, "processrundendencies doesnot contain {0}".format(search_text))
-        return self
+class ProcessRun(ExtJSHelper, StandardReportCommonActions):
     
+    selectors = {
+        "Menu items": "css=.x-menu-item-arrow"
+    }
 
+    custom_selectors = {
+        "Text Body": "/html/body/div[3]/div[2]",
+        "ProcessRun": "processRunPanel",
+        "ProcessRun Gridcolumn": "processRunPanel gridcolumn",
+        "GridColumn": 'processRunPanel gridcolumn',
+        "MenuItem": 'menu menuitem',
+        "Button": "processRunPanel reportTopBar button",
+        "ActiveTab": "centertabpanel tabbar tab[active=\'true\']",
+        "Tab": "centertabpanel tabbar tab",
+    }
+
+    @robot_alias("toggle_table_column_in__name__")
+    def toggle_table_column(self, column_name, menu_item):
+        # Trigger the dropdown, move the mouse over, toggle the column name
+        
+        self._toggle_column(column_name, menu_item)
+        return self
+
+    @robot_alias("input_text_into__name__filter")
+    def input_text_into_filter(self, column_name, text_input, clear=False):
+        xtype_input = self._construct_query(self.custom_selectors["ProcessRun Gridcolumn"], column_name)
+        id = self._get_inputfield_id(xtype_input)
+        if text_input == ' ' or clear:
+            self.clear_element_text(id)
+            return self
+        self._input_text_into_filter(id, text_input)
+        return self
+
+    @robot_alias("input_date_into__name__filter")
+    def input_date_into_filter(self, column_name, start_date=None, end_date=None, clear=False):
+        xtype_input = self._construct_query(self.custom_selectors["ProcessRun Gridcolumn"], column_name)
+        id = self._get_inputfield_id(xtype_input)
+        self._input_date_into_filter(id, start_date, end_date, clear)
+        return self
+
+    @robot_alias("click_button_in__name__")
+    def click_button(self, Button = "Retreive"):
+        if Button == "Retrieve":
+            self._click_button(self.custom_selectors["Button"])
+        elif Button == "Add":
+            pass
+        return self
+
+    @robot_alias("verify_filter_in__name__")
+    def verify_text(self, search_text='Process Run Ref', exist='True'):
+        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
+        if exist == 'True':
+            asserts.assert_true(search_text in text_body, "processrun doesnot contain {0}".format(search_text))
+        elif exist == 'False':
+            asserts.assert_false(search_text in text_body, "processrun does contain {0}".format(search_text))
+        return self
+        
+    def close_processrun_tab(self):
+        selector_section = self._construct_query(self.custom_selectors["Tab"], "Process Run", "text")
+        id_tab = self._get_component_id(selector_section)
+        id_tab_closeEl = self._append_closeEl(id_tab)
+        self._close_tab(id_tab_closeEl)
+        return self        
+
+
+class ProcessLastRun(ExtJSHelper, StandardReportCommonActions):
+    
+    selectors = {
+        "Menu items": "css=.x-menu-item-arrow",
+    }
+
+    custom_selectors = {
+        "Text Body": "/html/body/div[3]/div[2]",
+        "ProcessLastRun": "processLastRunPanel",
+        "ProcessLastRun Gridcolumn": "processLastRunPanel gridcolumn",
+        "GridColumn": 'processLastRunPanel gridcolumn',
+        "MenuItem": 'menu menuitem',
+        "Button": "processLastRunPanel reportTopBar button",
+        "ActiveTab": "centertabpanel tabbar tab[active=\'true\']",
+        "Tab": "centertabpanel tabbar tab"
+    }
+
+    @robot_alias("input_text_into__name__filter")
+    def input_text_into_filter(self, column_name, text_input, clear=False):
+        xtype_input = self._construct_query(self.custom_selectors["ProcessLastRun Gridcolumn"], column_name)
+        id_inputfield = self._get_inputfield_id(xtype_input)
+        if text_input == ' ' or clear:
+            self.clear_element_text(id_inputfield)
+            return self
+        self._input_text_into_filter(id_inputfield, text_input)
+        return self
+
+    @robot_alias("toggle_table_column_in__name__")
+    def toggle_table_column(self, column_name, menu_item):
+        # Trigger the dropdown, move the mouse over, toggle the column name
+
+        self._toggle_column(column_name, menu_item)
+        return self
+
+    @robot_alias("input_date_into__name__filter")
+    def input_date_into_filter(self, column_name, start_date=None, end_date=None, clear=False):
+        xtype_input = self._construct_query(self.custom_selectors["ProcessLastRun Gridcolumn"], column_name)
+        id = self._get_inputfield_id(xtype_input)
+        self._input_date_into_filter(id, start_date, end_date, clear)
+        return self
+
+    @robot_alias("verify_filter_in__name__")
+    def verify_text(self, search_text='Process Run Ref', exist='True'):
+        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
+        if exist == 'True':
+            asserts.assert_true(search_text in text_body, "processlastrun doesnot contain {0}".format(search_text))
+        elif exist == 'False':
+            asserts.assert_false(search_text in text_body, "processlastrun does contain {0}".format(search_text))
+        return self
+
+    @robot_alias("click_button_in__name__")
+    def click_button(self, Button = "Retreive"):
+        if Button == "Retrieve":
+            self._click_button(self.custom_selectors["Button"])
+        elif Button == "Add":
+            pass        
+        return self
+        
+    def close_processlastrun_tab(self):
+        selector_section = self._construct_query(self.custom_selectors["Tab"], "Process Last Run", "text")
+        id_tab = self._get_component_id(selector_section)
+        id_tab_closeEl = self._append_closeEl(id_tab)
+        self._close_tab(id_tab_closeEl)
+        return self
+
+    @robot_alias("click_button_in__name__")
+    def click_button(self, Button = "Retreive"):
+        if Button == "Retrieve":
+            self._click_button(self.custom_selectors["Button"])
+        elif Button == "Add":
+            pass
+        return self
+
+
+class ProcessLog(ExtJSHelper, StandardReportCommonActions):
+    
+    selectors = {
+        "Menu items": "css=.x-menu-item-arrow"
+    }
+
+    custom_selectors = {
+        "Text Body": "/html/body/div[3]/div[2]",
+        "ProcessLog": "processLogPanel",
+        "ProcessLog Gridcolumn": "processLogPanel gridcolumn",
+        "GridColumn": 'processLogPanel gridcolumn',
+        "MenuItem": 'menu menuitem',
+        "Button": "processLogPanel reportTopBar button",
+        "ActiveTab": "centertabpanel tabbar tab[active=\'true\']",
+        "Tab": "centertabpanel tabbar tab"
+    }
+
+    @robot_alias("input_text_into__name__filter")
+    def input_text_into_filter(self, column_name, text_input, clear=False):
+        xtype_input = self._construct_query(self.custom_selectors["ProcessLog Gridcolumn"], column_name)
+        id = self._get_inputfield_id(xtype_input)
+        if text_input == ' ' or clear:
+            self.clear_element_text(id)
+            return self
+        self._input_text_into_filter(id, text_input)
+        return self
+
+    @robot_alias("input_date_into__name__filter")
+    def input_date_into_filter(self, column_name, start_date=None, end_date=None, clear=False):
+        xtype_input = self._construct_query(self.custom_selectors["ProcessLog Gridcolumn"], column_name)
+        id_inputfield = self._get_inputfield_id(xtype_input)
+        logger.debug('id for the date field is {0}'.format(id_inputfield))
+        self._input_date_into_filter(id_inputfield, start_date, end_date, clear)
+        return self
+
+    @robot_alias("verify_filter_in__name__")
+    def verify_text(self, search_text='Process Run Ref', exist='True'):
+        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
+        if exist == 'True':
+            asserts.assert_true(search_text in text_body, "processlog doesnot contain {0}".format(search_text))
+        elif exist == 'False':
+            asserts.assert_false(search_text in text_body, "processlog does contain {0}".format(search_text))
+        return self
+
+    @robot_alias("click_button_in__name__")
+    def click_button(self, Button = "Retreive"):
+        if Button == "Retrieve":
+            self._click_button(self.custom_selectors["Button"])
+        elif Button == "Add":
+            pass        
+        return self
+        
+    def close_processlog_tab(self):
+        selector_section = self._construct_query(self.custom_selectors["Tab"], "Process Log", "text")
+        id_tab = self._get_component_id(selector_section)
+        id_tab_closeEl = self._append_closeEl(id_tab)
+        self._close_tab(id_tab_closeEl)
+        return self
+
+    @robot_alias("toggle_table_column_in__name__")
+    def toggle_table_column(self, column_name, menu_item):
+        # Trigger the dropdown, move the mouse over, toggle the column name
+
+        self._toggle_column(column_name, menu_item)
+        return self
+
+    
+class ProcessNotProcessed(ExtJSHelper, StandardReportCommonActions):
+    
+    selectors = {
+        "Menu items": "css=.x-menu-item-arrow"
+    }
+
+    custom_selectors = {
+        "Text Body": "/html/body/div[3]/div[2]",
+        "ProcessNotProcessed": "processNotProcessedPanel",
+        "ProcessNotProcessed Gridcolumn": "processNotProcessedPanel gridcolumn",
+        "GridColumn": 'processNotProcessedPanel gridcolumn',
+        "MenuItem": 'menu menuitem',
+        "Button": "processNotProcessedPanel reportTopBar button",
+        "ActiveTab": "centertabpanel tabbar tab[active=\'true\']",
+        "Tab": "centertabpanel tabbar tab"
+    }
+    
+    @robot_alias("verify_filter_in__name__")
+    def verify_text(self, search_text='Proc Run Reference', exist='True'):
+        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
+        if exist == 'True':
+            asserts.assert_true(search_text in text_body, "processnotprocessed doesnot contain {0}".format(search_text))
+        elif exist == 'False':
+            asserts.assert_false(search_text in text_body, "processnotprocessed does contain {0}".format(search_text))
+        return self
+        
+    def close_processnotprocessed_tab(self):
+        selector_section = self._construct_query(self.custom_selectors["Tab"], "Process Not Processed", "text")
+        id_tab = self._get_component_id(selector_section)
+        id_tab_closeEl = self._append_closeEl(id_tab)
+        self._close_tab(id_tab_closeEl)
+        return self
+
+    @robot_alias("toggle_table_column_in__name__")
+    def toggle_table_column(self, column_name, menu_item):
+        # Trigger the dropdown, move the mouse over, toggle the column name
+
+        self._toggle_column(column_name, menu_item)
+        return self
+
+
+class ProcessRunDependency(ExtJSHelper, StandardReportCommonActions):
+    
+    selectors = {
+        "Menu items": "css=.x-menu-item-arrow"
+    }
+
+    custom_selectors = {
+        "Text Body": "/html/body/div[3]/div[2]",
+        "ProcRunDependencies": "procRunDependenciesPanel",
+        "ProcRunDependencies Gridcolumn": "procRunDependenciesPanel gridcolumn",
+        "GridColumn": 'procRunDependenciesPanel gridcolumn',
+        "MenuItem": 'menu menuitem',
+        "Button": "procRunDependenciesPanel reportTopBar button",
+        "ActiveTab": "centertabpanel tabbar tab[active=\'true\']",
+        "Tab": "centertabpanel tabbar tab"
+    }
+    #procRunDependenciesPanel
+
+    @robot_alias("input_text_into__name__filter")
+    def input_text_into_filter(self, column_name, text_input, clear=False):
+        xtype_input = self._construct_query(self.custom_selectors["ProcRunDependencies Gridcolumn"], column_name)
+        id = self._get_inputfield_id(xtype_input)
+        if text_input == ' ' or clear:
+            self.clear_element_text(id)
+            return self
+        self._input_text_into_filter(id, text_input)
+        return self
+
+    @robot_alias("input_date_into__name__filter")
+    def input_date_into_filter(self, column_name, start_date=None, end_date=None, clear=False):
+        xtype_input = self._construct_query(self.custom_selectors["ProcRunDependencies Gridcolumn"], column_name)
+        id = self._get_inputfield_id(xtype_input)
+        self._input_date_into_filter(id, start_date, end_date, clear)
+        return self
+
+    @robot_alias("toggle_table_column_in__name__")
+    def toggle_table_column(self, column_name, menu_item):
+        # Trigger the dropdown, move the mouse over, toggle the column name
+
+        self._toggle_column(column_name, menu_item)
+        return self
+
+    @robot_alias("verify_filter_in__name__")
+    def verify_text(self, search_text='Pre-Process Run Ref', exist='True'):
+        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
+        if exist == 'True':
+            asserts.assert_true(search_text in text_body, "processrundependency doesnot contain {0}".format(search_text))
+        elif exist == 'False':
+            asserts.assert_false(search_text in text_body, "processrundependency does contain {0}".format(search_text))
+        return self
+        
+    def close_processrundependecy_tab(self):
+        selector_section = self._construct_query(self.custom_selectors["Tab"], "Process Run Dependencies", "text")
+        id_tab = self._get_component_id(selector_section)
+        id_tab_closeEl = self._append_closeEl(id_tab)
+        self._close_tab(id_tab_closeEl)
+        return self        
+
+
+class ProcessDependencies(ExtJSHelper, StandardReportCommonActions):
+    
+    selectors = {
+        "Menu items": "css=.x-menu-item-arrow"
+    }
+
+    custom_selectors = {
+        "Text Body": "/html/body/div[3]/div[2]",
+        "ProcessDependencies": "processDependenciesPanel",
+        "ProcessDependencies Gridcolumn": "processDependenciesPanel gridcolumn",
+        "GridColumn": 'processDependenciesPanel gridcolumn',
+        "MenuItem": 'menu menuitem',
+        "Button": "procDependenciesPanel reportTopBar button",
+        "ActiveTab": "centertabpanel tabbar tab[active=\'true\']",
+        "Tab": "centertabpanel tabbar tab"
+    }
+    #processDependenciesPanel
+
+    @robot_alias("input_text_into__name__filter")
+    def input_text_into_filter(self, column_name, text_input):
+        xtype_input = self._construct_query(self.custom_selectors["ProcRunDependencies Gridcolumn"], column_name)
+        id = self._get_inputfield_id(xtype_input)
+        if text_input == ' ':
+            self.clear_element_text(id)
+            return self
+        self._input_text_into_filter(id, text_input)
+        return self
+
+    @robot_alias("toggle_table_column_in__name__")
+    def toggle_table_column(self, column_name, menu_item):
+        # Trigger the dropdown, move the mouse over, toggle the column name
+
+        self._toggle_column(column_name, menu_item)
+        return self
+
+    @robot_alias("verify_filter_in__name__")
+    def verify_text(self, search_text='PK Load Table Name', exist='True'):
+        text_body = self._get_text_from_activetab(self.custom_selectors["Text Body"])
+        if exist == 'True':
+            asserts.assert_true(search_text in text_body, "processdependencies doesnot contain {0}".format(search_text))
+        elif exist == 'False':
+            asserts.assert_false(search_text in text_body, "processdependencies does contain {0}".format(search_text))
+        return self
+        
+    def close_processdependecies_tab(self):
+        selector_section = self._construct_query(self.custom_selectors["Tab"], "Process Dependencies", "text")
+        id_tab = self._get_component_id(selector_section)
+        id_tab_closeEl = self._append_closeEl(id_tab)
+        self._close_tab(id_tab_closeEl)
+        return self
+
+if  __name__ == '__main__':
+    a = LoginPage()
+    a.baseurl="http://hulk:9990/e2dh/Login.html"
+    a.create_webdriver('Firefox')
+    a.go_to("http://hulk:9990/e2dh")
+    a.type_in_credential()
+    a.maximize_browser_window()
+    b=a.click_submit_credential()
+    f = b.click_process()
+    f.toggle_table_column()
+    f.toggle_table_column()
+    # f = b.click_process_run()
+    f = b.click_process_run()
+    f.toggle_table_column()
+    f.click_all_process_and_close()
+    d=b.click_process_log()
+    d.input_date_into_filter('Message Timestamp', "2014-04-04", "2015-12-22", clear=False)
+    d.click_button()
+    d.input_text_into_filter('Process Run Ref', 'abcd')
+    # d.click_all_process_and_close()
+    d.close_processlog_tab()
+    e = b.click_process_run_dependencies()
+    e.input_date_into_filter('Start Date', '2014-04-04', '2015-12-22')
+    e.input_text_into_filter('Process Run Ref', 'abcd')
+    e.close_processrundependecy_tab()
+    f = b.click_process()
+    f.click_all_process_and_close()
+    
+    
+ # 1. provide valid text and check the body contains the text
+ # 2. provide invalid text and check the body has zero rows
+ # 3. dates: provide date from the past and check the number of rows is zero
+ # 4. dates: provide date from the future and check number of rows is zero  
+ # with dates or text dont try scraping the page and trying to process. A user ...
+ # ... is not going to do those stuffs   
