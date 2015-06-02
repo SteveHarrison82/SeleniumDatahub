@@ -36,17 +36,7 @@ Datahub: Click all process properties and check input fields exist(standard repo
     Click Button in Process Tab                            Retrieve
     Click all process and close
     Close active tab
-    [Teardown]  Close DatahubApp    
-
-Datahub: Toggle column in Process tab(standard report->process)
-
-    Open DatahubApp
-    Login to datahub
-    Click link in standard report                           menu_name=Process
-    Toggle table column in Process Tab                      Process Name      Process Desc
-    Close active tab
     [Teardown]  Close DatahubApp
-
 
 Datahub: Verify filter Process Desc in Process(standard report->process)
 
@@ -149,7 +139,19 @@ Datahub: Verify filter Process Name in Process Run(standard report->process run)
     Close active tab
     [Teardown]  Close DatahubApp    
 
-    
+
+***Comments***
+Datahub: Toggle column in Process tab(standard report->process)
+
+    Open DatahubApp
+    Login to datahub
+    Click link in standard report                           menu_name=Process
+    Toggle table column in Process Tab                      Process Name      Process Desc
+    Close active tab
+    [Teardown]  Close DatahubApp
+
+
+
 Datahub: Toggle column in Process Not Processed(standard report->process not processed)
 
     Open DatahubApp

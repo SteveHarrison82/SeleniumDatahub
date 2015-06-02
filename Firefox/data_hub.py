@@ -809,6 +809,7 @@ class StandardReportCommonActions():
         "ClickOK": "xpath=//span[contains(text(),\"OK\")]",
         "FromDate": "name=from",
         "ToDate": "name=to",
+        "Menu items": "css=.x-menu-item-arrow",
         "ClickClear": "xpath=//span[contains(text(),\"Clear\")]",
         "ClickCancel": "xpath=//span[contains(text(),\"Cancel\")]",
     }    
